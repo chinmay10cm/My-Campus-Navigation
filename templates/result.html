@@ -161,12 +161,9 @@
 
         const data = await res.json();
 
-        if (!data.routes) {
+        if (!data.routes||data.routes.length==0) {
           document.getElementById("direction-text").innerText = "No route found.";
           return;
-        }
-        if (data.routes.length==0){
-          document.getElementById("direction-text").innerText="Destination Reached.";
         }
 
         const route = data.routes[0];
@@ -185,13 +182,12 @@
         if (step) {
           const stepName = step.name && step.name.length ? step.name : "the path";
           
-          // ✅ Extract OSRM maneuver info
           const maneuver = step.maneuver || {};
           const turnType = maneuver.type || "";
           const turnModifier = maneuver.modifier || ""; // e.g. "left", "right", "straight", "north"
           const directionHint = turnModifier ? `, then head ${turnModifier}` : "";
         
-          // ✅ Make it more natural
+          
           if (turnType === "turn" && turnModifier) {
             instruction = `Turn ${turnModifier} onto ${stepName}`;
           } else if (turnType === "depart") {
@@ -216,8 +212,12 @@ if (totalDistanceM < 1) {
 } else {
   displayDist = `${(totalDistanceM / 1000).toFixed(2)} km`;
 }
-
+if (displayDist=='0.0 cm'){
+  document.getElementById("distance-text").innerText='Destination Reached';
+  return;}
 document.getElementById("distance-text").innerText = `Distance: ${displayDist}`;
+
+
         
       } catch (err) {
         console.error("Error fetching directions:", err);
