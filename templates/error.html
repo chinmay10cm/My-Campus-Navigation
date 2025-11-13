@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Error</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      color: #333;
+      text-align: center;
+      padding: 80px;
+    }
+    .box {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      display: inline-block;
+    }
+    h1 {
+      color: #d9534f;
+    }
+    a {
+      text-decoration: none;
+      color: #007bff;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>⚠️ Route Not Found</h1>
+    <p>Sorry, we couldn’t find a route from <strong>{{ source }}</strong> to <strong>{{ destination }}</strong>.</p>
+    <p>{{ message }}</p>
+    <a href="/">⬅️ Go back to home</a>
+  </div>
+</body>
+</html>

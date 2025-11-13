@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select Route</title>
+
+  <style>
+    body {
+      background-color: rgb(236, 236, 236);
+      font-family: Arial, sans-serif;
+    }
+
+    u {
+      font-size: xx-large;
+    }
+
+    select {
+      font-size: x-large;
+      padding: 8px;
+      border-radius: 5px;
+    }
+
+    input {
+      background-color: rgb(0, 0, 0);
+      color: white;
+      font-size: x-large;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    input:hover {
+      background-color: rgb(14, 14, 14);
+      box-shadow: 0 12px 16px 0 rgba(58, 2, 95, 0.24),
+                  0 17px 50px 0 rgba(33, 4, 100, 0.19);
+    }
+
+    input:active {
+      background-color: #d6dbd6;
+      transform: translateY(4px);
+    }
+
+    footer {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      padding: 5px;
+      background-color: gray;
+      color: white;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <center>
+    <form method="post" action="{{ url_for('result') }}">
+      <br><br><br><br>
+      <u><b>Your Location</b></u><br><br>
+
+      <p>
+        <select id="source" name="source" required>
+          <option value="#">SELECT SOURCE</option>
+          <option value="home">Home</option>
+          <option value="main gate">Main Gate</option>
+        </select>
+      </p>
+
+      <br><br>
+
+      <u><b>Your Destination</b></u><br><br>
+
+      <p>
+        <select id="destination" name="destination" required>
+          <option value="#">SELECT DESTINATION</option>
+          <option value="home">Home</option>
+          <option value="main gate">Main Gate</option>
+        </select>
+      </p>
+
+      <br><br>
+      <input type="submit" value="Show Route">
+    </form>
+  </center>
+
+  
+</body>
+</html>

@@ -1,0 +1,3 @@
+SOURCE,DESTINATION,MAP_URL,LAT1,LON1,LAT2,LON2
+home,main gate,"https://www.google.com/maps/embed/v1/directions?key=YOUR_GOOGLE_API_KEY&origin=28.637205,77.361294&destination=28.636852,77.360709&mode=walking",28.637205,77.361294,28.639076,77.363080
+main gate,home,"https://www.google.com/maps/embed/v1/directions?key=YOUR_GOOGLE_API_KEY&origin=28.636852,77.360709&destination=28.637205,77.361294&mode=walking",28.639076,77.363080,28.637205,77.361294

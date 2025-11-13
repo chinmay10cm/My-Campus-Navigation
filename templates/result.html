@@ -1,0 +1,313 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ source }} → {{ destination }} | AR Navigation</title>
+
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      background: black;
+    }
+
+    video#camera {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+    }
+
+    #overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      color: white;
+      text-align: center;
+      font-family: Arial, sans-serif;
+      z-index: 2;
+      background: rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    #arrow {
+      font-size: 120px;
+      transition: transform 0.2s ease;
+    }
+
+    .info {
+      font-size: 18px;
+      margin-top: 15px;
+    }
+
+    iframe {
+      display: none; /* Hide the embedded map but still load it */
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 🎥 Camera Background -->
+  <video id="camera" autoplay playsinline></video>
+
+  <!-- 🧭 Navigation Overlay -->
+  <div id="overlay">
+    <h2>{{ source }} → {{ destination }}</h2>
+    <div id="arrow">⬆️</div>
+    <div class="info" id="direction-text">Getting directions...</div>
+    <div class="info" id="distance-text"></div>
+  </div>
+
+  <!-- Hidden map for route reference -->
+  <iframe src="{{ iframe }}" width="0" height="0"></iframe>
+
+  <!-- ✅ Safely inject Flask variables as JSON -->
+  
+  <script id="destination-data" type="application/json">
+	{
+	  "lat": {{ (dest_lat | default(12.972442)) | tojson }},
+	  "lng": {{ (dest_lng | default(77.580643)) | tojson }}
+	}
+</script>
+
+  <script>
+    const API_ENDPOINT = "/api/directions";
+
+    // ✅ Parse destination coordinates from JSON block
+    const DESTINATION = JSON.parse(document.getElementById("destination-data").textContent);
+
+    let currentPosition = null;
+    let currentHeading = 0;
+
+    // 🎥 Start camera
+    async function startCamera() {
+      const video = document.getElementById("camera");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        video.srcObject = stream;
+      } catch (e) {
+        alert("Unable to access camera");
+      }
+    }
+
+    // 🧭 Track compass heading
+    function startCompass() {
+      if (window.DeviceOrientationEvent) {
+        // Prefer absolute orientation
+        window.addEventListener("deviceorientationabsolute", (event) => {
+          if (event && typeof event.alpha === "number") {
+            currentHeading = 360 - event.alpha;
+            rotateArrow();
+          }
+        });
+
+        // Fallback if absolute not supported
+        window.addEventListener("deviceorientation", (event) => {
+          if (event && typeof event.alpha === "number") {
+            currentHeading = 360 - event.alpha;
+            rotateArrow();
+          }
+        });
+      }
+    }
+
+    function rotateArrow() {
+      document.getElementById("arrow").style.transform = `rotate(${currentHeading}deg)`;
+    }
+
+    //  Track live GPS position
+    function startLocationTracking() {
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(
+          async (pos) => {
+            currentPosition = {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            };
+            await updateDirections();
+          },
+          console.error,
+          { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+        );
+      }
+    }
+
+    // 🚶 Fetch walking directions from backend (OSRM)
+    async function updateDirections() {
+      if (!currentPosition) return;
+
+      try {
+        const res = await fetch(API_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            origin: currentPosition,
+            destination: DESTINATION,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!data.routes) {
+          document.getElementById("direction-text").innerText = "No route found.";
+          return;
+        }
+        if (data.routes.length==0){
+          document.getElementById("direction-text").innerText="Destination Reached.";
+        }
+
+        const route = data.routes[0];
+        const leg = route.legs && route.legs.length ? route.legs[0] : null;
+
+        if (!leg) {
+          document.getElementById("direction-text").innerText = "No route legs available.";
+          return;
+        }
+
+        const totalDistanceM = leg.distance || route.distance || 0;
+        const step = leg.steps && leg.steps.length ? leg.steps[0] : null;
+
+        let instruction = "Proceed on route";
+
+        if (step) {
+          const stepName = step.name && step.name.length ? step.name : "the path";
+          
+          // ✅ Extract OSRM maneuver info
+          const maneuver = step.maneuver || {};
+          const turnType = maneuver.type || "";
+          const turnModifier = maneuver.modifier || ""; // e.g. "left", "right", "straight", "north"
+          const directionHint = turnModifier ? `, then head ${turnModifier}` : "";
+        
+          // ✅ Make it more natural
+          if (turnType === "turn" && turnModifier) {
+            instruction = `Turn ${turnModifier} onto ${stepName}`;
+          } else if (turnType === "depart") {
+            instruction = `Start moving toward ${stepName}${directionHint}`;
+          } else if (turnType === "arrive") {
+            instruction = "You have reached your destination!";
+          } else {
+            instruction = `Walk ${Math.round(step.distance)} m on ${stepName}${directionHint}`;
+          }
+        }
+        
+        document.getElementById("direction-text").innerText = instruction;
+
+
+       
+
+        let displayDist;
+if (totalDistanceM < 1) {
+  displayDist = `${(totalDistanceM * 100).toFixed(1)} cm`;
+} else if (totalDistanceM < 1000) {
+  displayDist = `${totalDistanceM.toFixed(2)} m`;
+} else {
+  displayDist = `${(totalDistanceM / 1000).toFixed(2)} km`;
+}
+
+document.getElementById("distance-text").innerText = `Distance: ${displayDist}`;
+        
+      } catch (err) {
+        console.error("Error fetching directions:", err);
+        document.getElementById("direction-text").innerText = "Error fetching directions";
+      }
+    }
+
+    // 🚀 Initialize everything on load
+    window.onload = () => {
+      startCamera();
+      startCompass();
+      startLocationTracking();
+    };
+  </script>
+</body>
+</html>
+
+  <!-- <script> -->
+    const API_ENDPOINT = "/api/directions";
+    const DESTINATION = { lat: 12.972442, lng: 77.580643 }; // example, replace with your location
+
+    let currentPosition = null;
+    let currentHeading = 0;
+
+    async function startCamera() {
+      const video = document.getElementById("camera");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        video.srcObject = stream;
+      } catch (e) {
+        alert("Unable to access camera");
+      }
+    }
+
+    // Track compass heading
+    function startCompass() {
+      if (window.DeviceOrientationEvent) {
+        window.addEventListener("deviceorientationabsolute", (event) => {
+          currentHeading = 360 - event.alpha;
+          rotateArrow();
+        });
+      }
+    }
+
+    function rotateArrow() {
+      document.getElementById("arrow").style.transform = `rotate(${currentHeading}deg)`;
+    }
+
+    // Get live location updates
+    function startLocationTracking() {
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(async (pos) => {
+          currentPosition = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          };
+          await updateDirections();
+        }, console.error, { enableHighAccuracy: true });
+      }
+    }
+
+    async function updateDirections() {
+      if (!currentPosition) return;
+      const res = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          origin: currentPosition,
+          destination: DESTINATION,
+        }),
+      });
+      const data = await res.json();
+      if (!data.routes?.length) return;
+
+      const leg = data.routes[0].legs[0];
+      const step = leg.steps[0];
+      const instruction = step.html_instructions.replace(/<[^>]*>/g, '');
+      const distance = leg.distance.text;
+
+      document.getElementById("direction-text").innerText = instruction;
+      document.getElementById("distance-text").innerText = `Distance: ${distance}`;
+    }
+
+    window.onload = () => {
+      startCamera();
+      startCompass();
+      startLocationTracking();
+    };
+  <!-- </script> -->
+</body>
+</html>
