@@ -139,7 +139,7 @@ def index():
 def home():
    return render_template('home.html')
 
-@app.route('/result', methods=['POST'])
+@app.route('/result2', methods=['POST'])
 def result():
     source = request.form.get('source')
     destination = request.form.get('destination')
@@ -167,7 +167,7 @@ def result():
             dest_lng = None
 
         return render_template(
-            'result.html',
+            'result2.html',
             source=source,
             destination=destination,
             iframe=map_url,
