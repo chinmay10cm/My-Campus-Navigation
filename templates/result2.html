@@ -1,17 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ source }} → {{ destination }} | AR Navigation</title>
 
   <style>
-    body, html {
+    :root {
+      --neon-blue: #3b82f6;
+      --neon-cyan: #22d3ee;
+      --neon-red: #ff4d4d;
+      --glass: rgba(0, 0, 0, 0.28);
+      --text: #ffffff;
+    }
+
+    body,
+    html {
       margin: 0;
       padding: 0;
       overflow: hidden;
       height: 100%;
       background: black;
+      font-family: "Poppins", Arial, sans-serif;
+      color: var(--text);
     }
 
     video#camera {
@@ -24,58 +36,70 @@
       z-index: 1;
     }
 
-    
+    /* AR Path Canvas */
     #ar-path {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      z-index: 2.5;
+      z-index: 2;
       pointer-events: none;
     }
 
+    /* Overlay UI */
     #overlay {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      color: white;
-      text-align: center;
-      font-family: Arial, sans-serif;
       z-index: 3;
-      background: rgba(0, 0, 0, 0.25);
       display: flex;
       flex-direction: column;
       justify-content: center;
+      align-items: center;
+      background: var(--glass);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      text-shadow: 0 0 12px black;
+    }
+
+    #overlay h2 {
+      font-size: 1.6rem;
+      margin-bottom: 10px;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 12px var(--neon-cyan);
     }
 
     #arrow {
       font-size: 120px;
+      margin-bottom: 10px;
       transition: transform 0.2s ease;
+      text-shadow: 0 0 25px var(--neon-blue);
     }
 
     #destination-marker {
       font-size: 90px;
       position: absolute;
-      top: 18%;
+      top: 20%;
       left: 50%;
       transform: translate(-50%, -50%);
-      color: red;
-      text-shadow: 0 0 25px red;
-      opacity: 0.85;
-      z-index: 4;
+      color: var(--neon-red);
+      text-shadow: 0 0 25px var(--neon-red);
+      z-index: 5;
     }
 
     .info {
-      font-size: 18px;
-      margin-top: 12px;
+      font-size: 16px;
+      margin-top: 8px;
+      text-shadow: 0 0 8px var(--neon-blue);
     }
 
-    #eta-text, #summary-text {
-      font-size: 16px;
-      opacity: 0.8;
+    #offroute-text {
+      color: orange;
+      font-weight: bold;
+      text-shadow: 0 0 8px orange;
     }
 
     iframe {
@@ -86,16 +110,17 @@
 
 <body>
 
+  <!-- Camera -->
   <video id="camera" autoplay playsinline></video>
 
-  <!-- #endregion --> AR dotted path canvas -->
+  <!-- AR Path -->
   <canvas id="ar-path"></canvas>
 
+  <!-- UI Overlay -->
   <div id="overlay">
     <h2>{{ source }} → {{ destination }}</h2>
-    <div id="arrow">⬆️</div>
 
-    <!-- 📍 Floating Destination Marker -->
+    <div id="arrow">⬆️</div>
     <div id="destination-marker">📍</div>
 
     <div class="info" id="direction-text">Getting directions...</div>
@@ -104,11 +129,13 @@
     <div class="info" id="eta-text"></div>
     <div class="info" id="summary-text"></div>
 
-    <div class="info" id="offroute-text" style="color: orange; font-weight: bold;"></div>
+    <div class="info" id="offroute-text"></div>
   </div>
 
-  <iframe src="{{ iframe }}" width="0" height="0"></iframe>
+  <!-- Hidden iframe -->
+  <iframe src="{{ iframe }}"></iframe>
 
+  <!-- Destination JSON -->
   <script id="destination-data" type="application/json">
     {
       "lat": {{ (dest_lat | default(12.972442)) | tojson }},
@@ -124,90 +151,80 @@
     let currentHeading = 0;
     let lastRouteCoords = [];
 
+    /* Start Camera */
     async function startCamera() {
-      const video = document.getElementById("camera");
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment" }
         });
-        video.srcObject = stream;
-      } catch (e) {
-        alert("Unable to access camera");
+        document.getElementById("camera").srcObject = stream;
+      } catch {
+        alert("Camera permission denied!");
       }
     }
 
+    /* Compass */
     function startCompass() {
-      if (window.DeviceOrientationEvent) {
-        window.addEventListener("deviceorientationabsolute", (e) => {
-          if (e.alpha !== null) {
-            currentHeading = 360 - e.alpha;
-            rotateArrow();
-          }
-        });
-
-        window.addEventListener("deviceorientation", (e) => {
-          if (e.alpha !== null) {
-            currentHeading = 360 - e.alpha;
-            rotateArrow();
-          }
-        });
-      }
+      window.addEventListener("deviceorientation", (e) => {
+        if (e.alpha !== null) {
+          currentHeading = (360 - e.alpha) % 360;
+          rotateArrow();
+        }
+      });
     }
 
     function rotateArrow() {
-      document.getElementById("arrow").style.transform = `rotate(${currentHeading}deg)`;
+      document.getElementById("arrow").style.transform =
+        `rotate(${currentHeading}deg)`;
     }
 
-    /* GPS bearing calculation */
+    /* Bearing Calculation */
     function computeBearing(lat1, lon1, lat2, lon2) {
-      lat1 = lat1 * Math.PI / 180;
-      lon1 = lon1 * Math.PI / 180;
-      lat2 = lat2 * Math.PI / 180;
-      lon2 = lon2 * Math.PI / 180;
+      const toRad = d => d * Math.PI / 180;
+
+      lat1 = toRad(lat1);
+      lon1 = toRad(lon1);
+      lat2 = toRad(lat2);
+      lon2 = toRad(lon2);
 
       const dLon = lon2 - lon1;
       const y = Math.sin(dLon) * Math.cos(lat2);
-      const x = Math.cos(lat1) * Math.sin(lat2)
-              - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+      const x = Math.cos(lat1) * Math.sin(lat2) -
+        Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
 
-      let brng = Math.atan2(y, x);
-      brng = brng * 180 / Math.PI;
+      let brng = Math.atan2(y, x) * 180 / Math.PI;
       return (brng + 360) % 360;
     }
 
-    /
+    /* Convert Bearing → Screen Offset */
     function bearingToScreenOffset(bearing) {
       const maxShift = window.innerWidth * 0.45;
-      const rad = bearing * Math.PI / 180;
-      return Math.sin(rad) * maxShift;
+      return Math.sin(bearing * Math.PI / 180) * maxShift;
     }
 
-    /* Draw AR dotted path */
-    function drawARPath(routeCoords) {
+    /* Draw Dotted AR Path */
+    function drawARPath(coords) {
       const canvas = document.getElementById("ar-path");
       const ctx = canvas.getContext("2d");
 
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!coords.length || !currentPosition) return;
 
-      if (!currentPosition) return;
-
-      ctx.lineWidth = 5;
-      ctx.strokeStyle = "rgba(0,255,255,0.9)";
-      ctx.setLineDash([10, 10]);
+      ctx.setLineDash([10, 12]);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(0, 255, 255, 0.9)";
 
       ctx.beginPath();
 
-      routeCoords.forEach((coord, i) => {
-        const b = computeBearing(
-          currentPosition.lat, currentPosition.lng,
-          coord[1], coord[0]
-        );
+      coords.forEach((c, i) => {
+        const b = computeBearing(currentPosition.lat, currentPosition.lng, c[1], c[0]);
         const relative = (b - currentHeading + 360) % 360;
 
-        const x = window.innerWidth / 2 + bearingToScreenOffset(relative);
-        const y = 200 + i * 35; // vertical stacking = path illusion
+        const x = (window.innerWidth / 2) + bearingToScreenOffset(relative);
+        const y = 220 + i * 32;
 
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
@@ -216,43 +233,18 @@
       ctx.stroke();
     }
 
-    /* Detect off-route */
-    function detectOffRoute() {
-      if (!lastRouteCoords.length || !currentPosition) return;
-
-      let minDist = Infinity;
-
-      lastRouteCoords.forEach(c => {
-        const d = Math.sqrt(
-          Math.pow(currentPosition.lat - c[1], 2) +
-          Math.pow(currentPosition.lng - c[0], 2)
-        );
-        minDist = Math.min(minDist, d);
-      });
-
-      if (minDist > 0.00015)
-        document.getElementById("offroute-text").innerText = "⚠ Off route — recalculating...";
-      else
-        document.getElementById("offroute-text").innerText = "";
-    }
-
+    /* Track GPS */
     function startLocationTracking() {
-      if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(
-          async (pos) => {
-            currentPosition = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-            };
-            await updateDirections();
-            detectOffRoute();
-          },
-          console.error,
-          { enableHighAccuracy: true, maximumAge: 300, timeout: 5000 }
-        );
-      }
+      navigator.geolocation.watchPosition(async pos => {
+        currentPosition = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        };
+        await updateDirections();
+      }, console.error, { enableHighAccuracy: true });
     }
 
+    /* Fetch Directions */
     async function updateDirections() {
       if (!currentPosition) return;
 
@@ -260,82 +252,72 @@
         currentPosition.lat, currentPosition.lng,
         DESTINATION.lat, DESTINATION.lng
       );
+
       const relative = (bearing - currentHeading + 360) % 360;
-
-      /* Move floating destination pin */
-      const pinShift = bearingToScreenOffset(relative);
       document.getElementById("destination-marker").style.left =
-        `${(window.innerWidth / 2) + pinShift}px`;
+        `${(window.innerWidth / 2) + bearingToScreenOffset(relative)}px`;
 
-      try {
-        const res = await fetch(API_ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            origin: currentPosition,
-            destination: DESTINATION,
-          }),
-        });
+      const res = await fetch(API_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          origin: currentPosition,
+          destination: DESTINATION
+        })
+      });
 
-        const data = await res.json();
-        if (!data.routes || !data.routes.length) return;
+      const data = await res.json();
+      if (!data.routes?.length) return;
 
-        const route = data.routes[0];
+      const route = data.routes[0];
 
-      
+      /* Save geometry for AR path */
+      if (route.geometry?.coordinates) {
         lastRouteCoords = route.geometry.coordinates;
         drawARPath(lastRouteCoords);
-
-        const leg = route.legs?.[0];
-        if (!leg) return;
-
-        const totalDistanceM = leg.distance || 0;
-        const totalDuration = leg.duration || 0;
-
-        /* ETA */
-        document.getElementById("eta-text").innerText =
-          `ETA: ${Math.round(totalDuration / 60)} min`;
-
-        /* Summary */
-        document.getElementById("summary-text").innerText =
-          leg.summary ? `Route: ${leg.summary}` : "";
-
-        /* Instructions */
-        const step = leg.steps?.[0];
-        let instruction = "Proceed on route";
-
-        if (step) {
-          const name = step.name || "path";
-          const man = step.maneuver || {};
-          const type = man.type || "";
-          const modifier = man.modifier || "";
-
-          switch (type) {
-            case "turn": instruction = `Turn ${modifier} onto ${name}`; break;
-            case "depart": instruction = `Head towards ${name}`; break;
-            case "arrive": instruction = "You have reached your destination!"; break;
-            case "continue": instruction = `Continue ${modifier}`; break;
-            default:
-              instruction = `Walk ${Math.round(step.distance)} m on ${name}`;
-          }
-        }
-
-        document.getElementById("direction-text").innerText = instruction;
-
-        /* Distance */
-        let displayDist;
-        if (totalDistanceM < 1) displayDist = `${(totalDistanceM * 100).toFixed(1)} cm`;
-        else if (totalDistanceM < 1000) displayDist = `${totalDistanceM.toFixed(1)} m`;
-        else displayDist = `${(totalDistanceM / 1000).toFixed(2)} km`;
-
-        document.getElementById("distance-text").innerText =
-          (displayDist === "0.0 cm") ? "Destination Reached" : `Distance: ${displayDist}`;
-
-      } catch (err) {
-        console.error(err);
       }
+
+      const leg = route.legs?.[0];
+      if (!leg) return;
+
+      /* ETA */
+      document.getElementById("eta-text").innerText = `ETA: ${Math.round(leg.duration / 60)} min`;
+
+      /* Summary */
+      document.getElementById("summary-text").innerText =
+        leg.summary ? `Route: ${leg.summary}` : "";
+
+      /* Instruction */
+      const step = leg.steps?.[0];
+      let instruction = "Walk straight";
+
+      if (step) {
+        const name = step.name || "path";
+        const type = step.maneuver?.type || "";
+        const mod = step.maneuver?.modifier || "";
+
+        switch (type) {
+          case "turn": instruction = `Turn ${mod} onto ${name}`; break;
+          case "depart": instruction = `Head towards ${name}`; break;
+          case "arrive": instruction = "Destination reached"; break;
+          default: instruction = `Walk on ${name}`;
+        }
+      }
+
+      document.getElementById("direction-text").innerText = instruction;
+
+      /* Distance */
+      const dist = leg.distance;
+      let text =
+        dist < 1 ? `${(dist * 100).toFixed(1)} cm` :
+        dist < 1000 ? `${dist.toFixed(1)} m` :
+        `${(dist / 1000).toFixed(2)} km`;
+
+      document.getElementById("distance-text").innerText =
+        dist < 1 ? "Destination Reached" : `Distance: ${text}`;
     }
 
+    /* Start everything */
     window.onload = () => {
       startCamera();
       startCompass();
