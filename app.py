@@ -169,7 +169,6 @@ def result():
             'result2.html',
             source=source,
             destination=destination,
-            iframe=map_url,
             dest_lat=dest_lat,
             dest_lng=dest_lng
         )
