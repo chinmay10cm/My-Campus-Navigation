@@ -46,8 +46,8 @@
 
 # app = Flask(__name__)
 
-MAP_CSV = 'location_routes.csv'
-GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_API_KEY"
+# MAP_CSV = 'location_routes.csv'
+# GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_API_KEY"
 
 # Load CSV into memory
 # def load_routes():
