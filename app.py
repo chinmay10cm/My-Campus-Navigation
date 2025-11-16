@@ -117,7 +117,7 @@ import os
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MAP_CSV = os.path.join(BASE_DIR, 'map_direction.csv')
+MAP_CSV = os.path.join(BASE_DIR, 'location_routes.csv')
 
 
 
