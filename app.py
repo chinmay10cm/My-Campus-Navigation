@@ -151,7 +151,6 @@ def result():
     )
 
     if match:
-        map_url = match['MAP_URL']
 
         # Minimal: pull destination coordinates from CSV row (adjust names if your CSV differs)
         # Expect columns like LAT2 and LON2 in your CSV for destination coordinates
